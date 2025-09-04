@@ -1,0 +1,107 @@
+# Solace Agent Mesh Agent Configuration
+
+log:
+  stdout_log_level: INFO
+  log_file_level: DEBUG
+  log_file: a2a_agent.log
+
+!include ../shared_config.yaml
+
+apps:
+  - name: "Weather__app"
+    app_base_path: .
+    app_module: solace_agent_mesh.agent.sac.app
+    broker:
+      <<: *broker_connection
+
+    app_config:
+      namespace: "shlo"
+      supports_streaming: true
+      agent_name: "Weather"
+      display_name: "Weather Agent"
+      model: *general_model 
+
+      instruction: |
+        You are a professional weather agent that provides accurate, up-to-date weather information.
+        
+        Your capabilities include:
+        1. Getting current weather conditions for any location worldwide
+        2. Providing detailed weather forecasts up to 5 days
+        3. Saving weather reports as files for future reference
+        
+        Guidelines:
+        - Always specify the location clearly when providing weather information
+        - Include relevant details like temperature, conditions, humidity, and wind
+        - Offer to save weather reports when providing detailed information
+        - Be helpful in suggesting appropriate clothing or activities based on weather
+        - If a location is ambiguous, ask for clarification (city, state/province, country)
+        
+        When users ask about weather, use the appropriate tools to fetch real-time data.
+        Present information in a clear, organized manner that's easy to understand.
+        
+      # Lifecycle functions
+      agent_init_function:
+        module: "src.weather_agent.lifecycle"
+        name: "initialize_weather_agent"
+        base_path: .
+        config:
+          api_key: ${OPENWEATHER_API_KEY}
+          base_url: "https://api.openweathermap.org/data/2.5"
+          startup_message: "Weather Agent is ready to provide weather information!"
+      
+      agent_cleanup_function:
+        module: "src.weather_agent.lifecycle"
+        base_path: .
+        name: "cleanup_weather_agent"
+      
+      # Tools configuration
+      tools:
+        # Current weather tool
+        - tool_type: python
+          component_module: "src.weather_agent.tools"
+          component_base_path: .
+          function_name: "get_current_weather"
+          tool_description: "Get current weather conditions for a specified location"
+          tool_config:
+            api_key: ${OPENWEATHER_API_KEY}
+
+        # Weather forecast tool
+        - tool_type: python
+          component_module: "src.weather_agent.tools"
+          function_name: "get_weather_forecast"
+          component_base_path: .
+          tool_description: "Get weather forecast for up to 5 days for a specified location"
+          tool_config:
+            api_key: ${OPENWEATHER_API_KEY}
+
+
+      session_service: *default_session_service
+      artifact_service: *default_artifact_service
+      
+      artifact_handling_mode: "ignore"
+      enable_embed_resolution: true
+      enable_artifact_content_instruction: true
+      data_tools_config: *default_data_tools_config
+
+      # Agent card
+      agent_card:
+        description: "Professional weather agent providing current conditions, forecasts, and weather comparisons"
+        defaultInputModes: ["text"]
+        defaultOutputModes: ["text"]
+        skills:
+          - id: "get_current_weather"
+            name: "Get Current Weather"
+            description: "Retrieve current weather conditions for any location worldwide"
+          - id: "get_weather_forecast"
+            name: "Get Weather Forecast"
+            description: "Provide detailed weather forecasts up to 5 days ahead"
+      
+      # Discovery & Communication
+      agent_card_publishing: 
+        interval_seconds: 10
+      agent_discovery: 
+        enabled: true
+      inter_agent_communication:
+        allow_list: ["*"] 
+        deny_list: [] 
+        request_timeout_seconds: 999999
